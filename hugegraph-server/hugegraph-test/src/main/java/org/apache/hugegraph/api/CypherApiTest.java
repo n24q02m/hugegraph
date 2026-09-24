@@ -19,6 +19,8 @@ package org.apache.hugegraph.api;
 
 import static org.apache.hugegraph.testutil.Assert.assertContains;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.junit.Before;
@@ -33,6 +35,8 @@ public class CypherApiTest extends BaseApiTest {
     private static final String PATH = URL_PREFIX + "/cypher";
     private static final String QUERY = "MATCH (n:person) where n.city ='Beijing' return n";
     private static final String QUERY_RESULT = "Beijing";
+    private static final String PARAM_QUERY =
+            "MATCH (n:person) WHERE n.city = $city RETURN n";
 
     @Before
     public void prepareSchema() {
@@ -70,6 +74,37 @@ public class CypherApiTest extends BaseApiTest {
                         "WHERE n.name = 'marko'\n" +
                         "RETURN n, friend.name AS friend";
         this.testCypherQueryAndContains(cypher, "friend");
+    }
+
+    @Test
+    public void testGetWithParameters() {
+        String query = "cypher=" +
+                       URLEncoder.encode(PARAM_QUERY, StandardCharsets.UTF_8) +
+                       "&parameters=" +
+                       URLEncoder.encode("{\"city\": \"Beijing\"}",
+                                         StandardCharsets.UTF_8);
+        Response r = client().getViaUri(baseUrl() + "/" + PATH + "?" + query);
+
+        this.validStatusAndTextContains(QUERY_RESULT, r);
+    }
+
+    @Test
+    public void testPostWithParameters() {
+        String parameters = URLEncoder.encode("{\"city\": \"Beijing\"}",
+                                              StandardCharsets.UTF_8);
+        Response r = client().postViaUri(baseUrl() + "/" + PATH +
+                                         "?parameters=" + parameters,
+                                         PARAM_QUERY);
+
+        this.validStatusAndTextContains(QUERY_RESULT, r);
+    }
+
+    @Test
+    public void testPostWithInvalidParameters() {
+        Response r = client().postViaUri(baseUrl() + "/" + PATH +
+                                         "?parameters=not-a-json", QUERY);
+
+        assertResponseStatus(400, r);
     }
 
     private void testCypherQueryAndContains(String cypher, String containsText) {

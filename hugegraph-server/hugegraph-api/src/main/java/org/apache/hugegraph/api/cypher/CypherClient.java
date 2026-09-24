@@ -60,7 +60,9 @@ public final class CypherClient {
         this.configurationSupplier = configurationSupplier;
     }
 
-    public CypherModel submitQuery(String cypherQuery, @Nullable Map<String, String> aliases) {
+    public CypherModel submitQuery(String cypherQuery,
+                                   @Nullable Map<String, String> aliases,
+                                   @Nullable Map<String, Object> parameters) {
         E.checkArgument(cypherQuery != null && !cypherQuery.isEmpty(),
                         "The cypher-query parameter can't be null or empty");
 
@@ -71,7 +73,7 @@ public final class CypherClient {
             client = client.alias(aliases);
         }
 
-        RequestMessage request = createRequest(cypherQuery);
+        RequestMessage request = createRequest(cypherQuery, parameters);
         CypherModel res;
 
         try {
@@ -89,11 +91,15 @@ public final class CypherClient {
         return res;
     }
 
-    private RequestMessage createRequest(String cypherQuery) {
-        return RequestMessage.build(Tokens.OPS_EVAL)
-                             .processor("cypher")
-                             .add(Tokens.ARGS_GREMLIN, cypherQuery)
-                             .create();
+    private RequestMessage createRequest(String cypherQuery,
+                                         @Nullable Map<String, Object> parameters) {
+        RequestMessage.Builder builder = RequestMessage.build(Tokens.OPS_EVAL)
+                                                       .processor("cypher")
+                                                       .add(Tokens.ARGS_GREMLIN, cypherQuery);
+        if (parameters != null && !parameters.isEmpty()) {
+            builder.add(Tokens.ARGS_BINDINGS, parameters);
+        }
+        return builder.create();
     }
 
     private List<Object> doQueryList(Client client, RequestMessage request)

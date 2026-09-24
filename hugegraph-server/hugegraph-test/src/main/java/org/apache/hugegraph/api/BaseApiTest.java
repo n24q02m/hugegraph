@@ -18,6 +18,7 @@
 package org.apache.hugegraph.api;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -840,6 +841,15 @@ public class BaseApiTest {
 
         public Response post(String path, Entity<?> entity) {
             return this.target.path(path).request().post(entity);
+        }
+
+        public Response getViaUri(String uri) {
+            return this.client.target(URI.create(uri)).request().get();
+        }
+
+        public Response postViaUri(String uri, String content) {
+            return this.client.target(URI.create(uri)).request()
+                              .post(Entity.json(content));
         }
 
         public Response put(String path, String id, String content,

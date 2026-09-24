@@ -20,6 +20,7 @@ package org.apache.hugegraph.api.cypher;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,6 +29,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hugegraph.api.API;
 import org.apache.hugegraph.api.filter.CompressInterceptor;
 import org.apache.hugegraph.util.E;
+import org.apache.hugegraph.util.JsonUtil;
 import org.apache.hugegraph.util.Log;
 import org.slf4j.Logger;
 
@@ -78,9 +80,12 @@ public class CypherAPI extends API {
                              @Parameter(description = "The graph name")
                              @PathParam("graph") String graph,
                              @Parameter(description = "The cypher query string")
-                             @QueryParam("cypher") String cypher) {
+                             @QueryParam("cypher") String cypher,
+                             @Parameter(description = "JSON object of cypher parameters, " +
+                                        "e.g. {\"name\": \"marko\"}")
+                             @QueryParam("parameters") String parameters) {
 
-        return this.queryByCypher(headers, graphspace, graph, cypher);
+        return this.queryByCypher(headers, graphspace, graph, cypher, parameters);
     }
 
 
@@ -95,13 +100,17 @@ public class CypherAPI extends API {
                             @Parameter(description = "The graph name")
                             @PathParam("graph") String graph,
                             @Parameter(description = "The cypher query string")
-                            String cypher) {
+                            String cypher,
+                            @Parameter(description = "JSON object of cypher parameters, " +
+                                       "e.g. {\"name\": \"marko\"}")
+                            @QueryParam("parameters") String parameters) {
 
-        return this.queryByCypher(headers, graphspace, graph, cypher);
+        return this.queryByCypher(headers, graphspace, graph, cypher, parameters);
     }
 
     private CypherModel queryByCypher(HttpHeaders headers, String graphspace,
-                                      String graph, String cypher) {
+                                      String graph, String cypher,
+                                      String parametersJson) {
         E.checkArgument(graphspace != null && !graphspace.isEmpty(),
                         "The graphspace parameter can't be null or empty");
         E.checkArgument(graph != null && !graph.isEmpty(),
@@ -109,12 +118,31 @@ public class CypherAPI extends API {
         E.checkArgument(cypher != null && !cypher.isEmpty(),
                         "The cypher parameter can't be null or empty");
 
+        Map<String, Object> parameters = parseParameters(parametersJson);
+
         String graphInfo = graphspace + "-" + graph;
         Map<String, String> aliases = new HashMap<>(2, 1);
         aliases.put("graph", graphInfo);
         aliases.put("g", "__g_" + graphInfo);
 
-        return this.client(headers).submitQuery(cypher, aliases);
+        return this.client(headers).submitQuery(cypher, aliases, parameters);
+    }
+
+    private static Map<String, Object> parseParameters(String parametersJson) {
+        if (parametersJson == null || parametersJson.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> parameters;
+        try {
+            parameters = JsonUtil.fromJson(parametersJson, Map.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                      "The parameters parameter must be a valid JSON object, " +
+                      "e.g. {\"name\": \"marko\"}", e);
+        }
+        E.checkArgument(parameters != null,
+                        "The parameters parameter must be a JSON object");
+        return parameters;
     }
 
     private CypherClient client(HttpHeaders headers) {

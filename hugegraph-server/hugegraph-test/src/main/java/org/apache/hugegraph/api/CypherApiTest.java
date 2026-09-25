@@ -18,6 +18,7 @@
 package org.apache.hugegraph.api;
 
 import static org.apache.hugegraph.testutil.Assert.assertContains;
+import static org.junit.Assert.assertFalse;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -105,6 +106,34 @@ public class CypherApiTest extends BaseApiTest {
                                          "?parameters=not-a-json", QUERY);
 
         assertResponseStatus(400, r);
+    }
+
+    @Test
+    public void testSyntaxErrorHasStructuredErrorWithHint() {
+        Response r = client().post(PATH,
+                                   "MATCH (n:person) RETURN not_defined_var");
+        String content = assertResponseStatus(200, r);
+        assertContains("\"errors\"", content);
+        assertContains("SyntaxError", content);
+        assertContains("Declare the variable", content);
+    }
+
+    @Test
+    public void testUndefinedLabelHasSchemaHint() {
+        Response r = client().post(PATH, "MATCH (n:robot) RETURN n");
+        String content = assertResponseStatus(200, r);
+        assertContains("ExecutionError", content);
+        assertContains("Create the schema element", content);
+    }
+
+    @Test
+    public void testMissingParameterReturnsEmptyResult() {
+        // current behavior: a query referencing an absent parameter matches
+        // nothing and returns an empty result instead of an error (Neo4j
+        // returns "Expected parameter(s)" — known compatibility gap)
+        Response r = client().post(PATH, PARAM_QUERY);
+        String content = assertResponseStatus(200, r);
+        assertFalse(content.contains(QUERY_RESULT));
     }
 
     private void testCypherQueryAndContains(String cypher, String containsText) {
